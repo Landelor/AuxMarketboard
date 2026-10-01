@@ -18,6 +18,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IClientState ClientState { get; private set; } = null!;
     [PluginService] internal static IPlayerState PlayerState { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
+    [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
 
     private readonly WindowSystem windowSystem = new("AuxMarketboard");
     private readonly MainWindow mainWindow;
@@ -56,7 +57,8 @@ public sealed class Plugin : IDalamudPlugin
 
         universalisClient = new UniversalisClient();
         itemResolver = new ItemResolver(DataManager);
-        mainWindow = new MainWindow(Configuration, universalisClient, itemResolver);
+        var marketboardSearchService = new MarketboardSearchService(GameGui, Log);
+        mainWindow = new MainWindow(Configuration, universalisClient, itemResolver, marketboardSearchService);
 
         windowSystem.AddWindow(mainWindow);
 

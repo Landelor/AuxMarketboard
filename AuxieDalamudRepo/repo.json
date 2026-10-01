@@ -4,7 +4,7 @@
     "Name": "AuxMarketboard",
     "InternalName": "AuxMarketboard",
     "IconUrl": "https://raw.githubusercontent.com/Landelor/AuxMarketboard/main/AuxMarketboard/plugin_icon.png",
-    "AssemblyVersion": "0.5.0.0",
+    "AssemblyVersion": "0.6.0.0",
     "TestingAssemblyVersion": null,
     "RepoUrl": "https://github.com/Landelor/AuxMarketboard",
     "ApplicableVersion": "any",
@@ -22,7 +22,7 @@
     "DownloadLinkInstall": "https://github.com/Landelor/AuxMarketboard/releases/latest/download/AuxMarketboard.zip",
     "DownloadLinkTesting": "https://github.com/Landelor/AuxMarketboard/releases/latest/download/AuxMarketboard.zip",
     "DownloadLinkUpdate": "https://github.com/Landelor/AuxMarketboard/releases/latest/download/AuxMarketboard.zip",
-    "LastUpdate": "1790835748"
+    "LastUpdate": "1790838187"
   },
   {
     "Author": "Auxie",

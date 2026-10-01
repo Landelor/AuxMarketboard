@@ -12,6 +12,7 @@ public sealed class MainWindow : Window, IDisposable
     private readonly Configuration configuration;
     private readonly UniversalisClient universalisClient;
     private readonly ItemResolver itemResolver;
+    private readonly MarketboardSearchService marketboardSearchService;
     private readonly object syncRoot = new();
     private readonly JsonSerializerOptions jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
@@ -33,12 +34,13 @@ public sealed class MainWindow : Window, IDisposable
     private readonly HashSet<string> expandedBuyServers = new(StringComparer.OrdinalIgnoreCase);
     private int lastUpdatedItemCount;
 
-    public MainWindow(Configuration configuration, UniversalisClient universalisClient, ItemResolver itemResolver)
+    public MainWindow(Configuration configuration, UniversalisClient universalisClient, ItemResolver itemResolver, MarketboardSearchService marketboardSearchService)
         : base("AuxMarketboard")
     {
         this.configuration = configuration;
         this.universalisClient = universalisClient;
         this.itemResolver = itemResolver;
+        this.marketboardSearchService = marketboardSearchService;
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -430,6 +432,8 @@ public sealed class MainWindow : Window, IDisposable
         ImGui.TableSetupColumn("Total");
         ImGui.TableHeadersRow();
 
+        var marketboardOpen = marketboardSearchService.IsMarketboardSearchOpen();
+
         foreach (var serverGroup in serverGroups)
         {
             var isExpanded = expandedBuyServers.Contains(serverGroup.Server);
@@ -465,11 +469,12 @@ public sealed class MainWindow : Window, IDisposable
             ImGui.TableSetColumnIndex(0);
             ImGui.TextUnformatted(string.Empty);
             ImGui.TableSetColumnIndex(1);
-            if (ImGui.BeginTable($"buyModeItems-{serverGroup.Server}", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders | ImGuiTableFlags.Resizable))
+            if (ImGui.BeginTable($"buyModeItems-{serverGroup.Server}", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders | ImGuiTableFlags.Resizable))
             {
                 ImGui.TableSetupColumn("Item");
                 ImGui.TableSetupColumn("Qty to Buy");
                 ImGui.TableSetupColumn("Unit Price");
+                ImGui.TableSetupColumn("Actions");
                 ImGui.TableHeadersRow();
 
                 foreach (var row in serverGroup.Rows)
@@ -481,6 +486,17 @@ public sealed class MainWindow : Window, IDisposable
                     ImGui.TextUnformatted(row.QuantityUsed.ToString());
                     ImGui.TableSetColumnIndex(2);
                     ImGui.TextUnformatted($"{row.UnitPrice:N0}");
+                    ImGui.TableSetColumnIndex(3);
+                    ImGui.BeginDisabled(!marketboardOpen);
+                    if (ImGui.SmallButton($"Search##buyModeSearch-{serverGroup.Server}-{row.ItemId}"))
+                    {
+                        marketboardSearchService.SearchForItem(row.ItemName);
+                    }
+                    ImGui.EndDisabled();
+                    if (!marketboardOpen && ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("Open the marketboard search window to use this.");
+                    }
                 }
 
                 ImGui.EndTable();
