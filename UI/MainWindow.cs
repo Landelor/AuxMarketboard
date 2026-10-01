@@ -371,20 +371,20 @@ public sealed class MainWindow : Window, IDisposable
 
     private void DrawBuyModeTable(List<ListEntry> snapshot)
     {
-        var listings = new List<(string Server, uint ItemId, string ItemName, long UnitPrice, bool IsFallback)>();
+        var listings = new List<(string Server, uint ItemId, string ItemName, long UnitPrice, int ListingQuantity, bool IsFallback)>();
         foreach (var entry in snapshot)
         {
             var selected = entry.RecentPrices.Take(entry.Quantity).ToList();
             foreach (var price in selected)
             {
                 var server = string.IsNullOrWhiteSpace(price.WorldName) ? "Unknown" : price.WorldName;
-                listings.Add((server, entry.ItemId, entry.Name, price.UnitPrice, false));
+                listings.Add((server, entry.ItemId, entry.Name, price.UnitPrice, Math.Max(1, price.Quantity), false));
             }
 
             var missing = entry.Quantity - selected.Count;
             for (var i = 0; i < missing; i++)
             {
-                listings.Add(("Fallback/Unknown", entry.ItemId, entry.Name, entry.FallbackUnitPrice, true));
+                listings.Add(("Fallback/Unknown", entry.ItemId, entry.Name, entry.FallbackUnitPrice, 1, true));
             }
         }
 
@@ -402,6 +402,7 @@ public sealed class MainWindow : Window, IDisposable
                         x.ItemId,
                         x.ItemName,
                         x.UnitPrice,
+                        x.ListingQuantity,
                         x.IsFallback,
                     })
                     .ToList(),
@@ -449,7 +450,7 @@ public sealed class MainWindow : Window, IDisposable
             ImGui.TableSetColumnIndex(1);
             ImGui.TextUnformatted($"{serverGroup.Rows.Count} listings");
             ImGui.TableSetColumnIndex(2);
-            ImGui.TextUnformatted(serverGroup.Rows.Count.ToString());
+            ImGui.TextUnformatted(serverGroup.Rows.Sum(x => x.ListingQuantity).ToString());
             ImGui.TableSetColumnIndex(3);
             ImGui.TextUnformatted($"{serverGroup.ServerTotal:N0}");
 
@@ -462,9 +463,10 @@ public sealed class MainWindow : Window, IDisposable
             ImGui.TableSetColumnIndex(0);
             ImGui.TextUnformatted(string.Empty);
             ImGui.TableSetColumnIndex(1);
-            if (ImGui.BeginTable($"buyModeItems-{serverGroup.Server}", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders | ImGuiTableFlags.Resizable))
+            if (ImGui.BeginTable($"buyModeItems-{serverGroup.Server}", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders | ImGuiTableFlags.Resizable))
             {
                 ImGui.TableSetupColumn("Item");
+                ImGui.TableSetupColumn("Listing Qty");
                 ImGui.TableSetupColumn("Unit Price");
                 ImGui.TableHeadersRow();
 
@@ -474,6 +476,8 @@ public sealed class MainWindow : Window, IDisposable
                     ImGui.TableSetColumnIndex(0);
                     ImGui.TextUnformatted(row.IsFallback ? $"{row.ItemName} (est.)" : row.ItemName);
                     ImGui.TableSetColumnIndex(1);
+                    ImGui.TextUnformatted(row.ListingQuantity.ToString());
+                    ImGui.TableSetColumnIndex(2);
                     ImGui.TextUnformatted($"{row.UnitPrice:N0}");
                 }
 
@@ -619,6 +623,7 @@ public sealed class MainWindow : Window, IDisposable
                         .Select(x => new RecentPriceDetail
                         {
                             UnitPrice = x.PricePerUnit,
+                            Quantity = Math.Max(1, x.Quantity),
                             WorldName = x.WorldName ?? string.Empty,
                             UnixTimestamp = x.LastReviewTime,
                         })
@@ -634,6 +639,7 @@ public sealed class MainWindow : Window, IDisposable
                             .Select(x => new RecentPriceDetail
                             {
                                 UnitPrice = x.PricePerUnit,
+                                Quantity = Math.Max(1, x.Quantity),
                                 WorldName = x.WorldName ?? string.Empty,
                                 UnixTimestamp = x.Timestamp,
                             })
@@ -1074,6 +1080,7 @@ public sealed class MainWindow : Window, IDisposable
             RecentPrices = source.RecentPrices.Select(x => new RecentPriceDetail
             {
                 UnitPrice = x.UnitPrice,
+                Quantity = x.Quantity,
                 WorldName = x.WorldName,
                 UnixTimestamp = x.UnixTimestamp,
             }).ToList(),

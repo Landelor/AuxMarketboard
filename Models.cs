@@ -34,6 +34,7 @@ public sealed class ListEntry
 public sealed class RecentPriceDetail
 {
     public long UnitPrice { get; set; }
+    public int Quantity { get; set; } = 1;
     public string WorldName { get; set; } = string.Empty;
     public long UnixTimestamp { get; set; }
 }
@@ -73,6 +74,9 @@ public sealed class UniversalisListing
     [JsonPropertyName("pricePerUnit")]
     public int PricePerUnit { get; set; }
 
+    [JsonPropertyName("quantity")]
+    public int Quantity { get; set; } = 1;
+
     [JsonPropertyName("lastReviewTime")]
     public long LastReviewTime { get; set; }
 
@@ -84,6 +88,9 @@ public sealed class UniversalisHistoryEntry
 {
     [JsonPropertyName("pricePerUnit")]
     public int PricePerUnit { get; set; }
+
+    [JsonPropertyName("quantity")]
+    public int Quantity { get; set; } = 1;
 
     [JsonPropertyName("timestamp")]
     public long Timestamp { get; set; }
