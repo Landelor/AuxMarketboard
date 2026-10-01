@@ -371,20 +371,13 @@ public sealed class MainWindow : Window, IDisposable
 
     private void DrawBuyModeTable(List<ListEntry> snapshot)
     {
-        var listings = new List<(string Server, uint ItemId, string ItemName, long UnitPrice, int ListingQuantity, bool IsFallback)>();
+        var listings = new List<(string Server, uint ItemId, string ItemName, long UnitPrice, int QuantityUsed, bool IsFallback)>();
         foreach (var entry in snapshot)
         {
-            var selected = entry.RecentPrices.Take(entry.Quantity).ToList();
-            foreach (var price in selected)
+            foreach (var line in entry.BuildFulfillmentPlan())
             {
-                var server = string.IsNullOrWhiteSpace(price.WorldName) ? "Unknown" : price.WorldName;
-                listings.Add((server, entry.ItemId, entry.Name, price.UnitPrice, Math.Max(1, price.Quantity), false));
-            }
-
-            var missing = entry.Quantity - selected.Count;
-            for (var i = 0; i < missing; i++)
-            {
-                listings.Add(("Fallback/Unknown", entry.ItemId, entry.Name, entry.FallbackUnitPrice, 1, true));
+                var server = string.IsNullOrWhiteSpace(line.WorldName) ? "Unknown" : line.WorldName;
+                listings.Add((server, entry.ItemId, entry.Name, line.UnitPrice, line.QuantityUsed, line.IsFallback));
             }
         }
 
@@ -393,7 +386,7 @@ public sealed class MainWindow : Window, IDisposable
             .Select(g => new
             {
                 Server = g.Key,
-                ServerTotal = g.Sum(x => x.UnitPrice),
+                ServerTotal = g.Sum(x => x.UnitPrice * x.QuantityUsed),
                 Rows = g
                     .OrderBy(x => x.ItemName, StringComparer.OrdinalIgnoreCase)
                     .ThenBy(x => x.UnitPrice)
@@ -402,7 +395,7 @@ public sealed class MainWindow : Window, IDisposable
                         x.ItemId,
                         x.ItemName,
                         x.UnitPrice,
-                        x.ListingQuantity,
+                        x.QuantityUsed,
                         x.IsFallback,
                     })
                     .ToList(),
@@ -450,7 +443,7 @@ public sealed class MainWindow : Window, IDisposable
             ImGui.TableSetColumnIndex(1);
             ImGui.TextUnformatted($"{serverGroup.Rows.Count} listings");
             ImGui.TableSetColumnIndex(2);
-            ImGui.TextUnformatted(serverGroup.Rows.Sum(x => x.ListingQuantity).ToString());
+            ImGui.TextUnformatted(serverGroup.Rows.Sum(x => x.QuantityUsed).ToString());
             ImGui.TableSetColumnIndex(3);
             ImGui.TextUnformatted($"{serverGroup.ServerTotal:N0}");
 
@@ -466,7 +459,7 @@ public sealed class MainWindow : Window, IDisposable
             if (ImGui.BeginTable($"buyModeItems-{serverGroup.Server}", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders | ImGuiTableFlags.Resizable))
             {
                 ImGui.TableSetupColumn("Item");
-                ImGui.TableSetupColumn("Listing Qty");
+                ImGui.TableSetupColumn("Qty to Buy");
                 ImGui.TableSetupColumn("Unit Price");
                 ImGui.TableHeadersRow();
 
@@ -476,7 +469,7 @@ public sealed class MainWindow : Window, IDisposable
                     ImGui.TableSetColumnIndex(0);
                     ImGui.TextUnformatted(row.IsFallback ? $"{row.ItemName} (est.)" : row.ItemName);
                     ImGui.TableSetColumnIndex(1);
-                    ImGui.TextUnformatted(row.ListingQuantity.ToString());
+                    ImGui.TextUnformatted(row.QuantityUsed.ToString());
                     ImGui.TableSetColumnIndex(2);
                     ImGui.TextUnformatted($"{row.UnitPrice:N0}");
                 }

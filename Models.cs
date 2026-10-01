@@ -11,25 +11,44 @@ public sealed class ListEntry
     public long FallbackUnitPrice { get; set; }
     public string Status { get; set; } = "Not queried";
 
-    public long EstimatedTotal
+    /// <summary>
+    /// Builds the cheapest way to acquire <see cref="Quantity"/> units of this item from the
+    /// available listings (assumed sorted cheapest-first), buying whole listings before moving
+    /// on to the next cheapest one, and only taking a partial amount from the last listing used.
+    /// If the available listings don't cover the full quantity, the shortfall is represented as
+    /// a single fallback entry.
+    /// </summary>
+    public List<FulfillmentLine> BuildFulfillmentPlan()
     {
-        get
+        var plan = new List<FulfillmentLine>();
+        var remaining = Quantity;
+
+        foreach (var listing in RecentPrices)
         {
-            if (RecentPrices.Count == 0 && FallbackUnitPrice <= 0)
+            if (remaining <= 0)
             {
-                return 0;
+                break;
             }
 
-            var prices = RecentPrices.Take(Quantity).Select(x => x.UnitPrice).ToList();
-            while (prices.Count < Quantity)
-            {
-                prices.Add(FallbackUnitPrice);
-            }
-
-            return prices.Sum();
+            var available = Math.Max(1, listing.Quantity);
+            var take = Math.Min(remaining, available);
+            plan.Add(new FulfillmentLine(listing.WorldName, listing.UnitPrice, take, false));
+            remaining -= take;
         }
+
+        if (remaining > 0 && FallbackUnitPrice > 0)
+        {
+            plan.Add(new FulfillmentLine("Fallback/Unknown", FallbackUnitPrice, remaining, true));
+            remaining = 0;
+        }
+
+        return plan;
     }
+
+    public long EstimatedTotal => BuildFulfillmentPlan().Sum(x => x.UnitPrice * x.QuantityUsed);
 }
+
+public readonly record struct FulfillmentLine(string WorldName, long UnitPrice, int QuantityUsed, bool IsFallback);
 
 public sealed class RecentPriceDetail
 {
