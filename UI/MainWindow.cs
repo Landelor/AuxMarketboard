@@ -371,41 +371,38 @@ public sealed class MainWindow : Window, IDisposable
 
     private void DrawBuyModeTable(List<ListEntry> snapshot)
     {
-        var grouped = new Dictionary<(string Server, uint ItemId, string ItemName), (int Quantity, long Total)>();
+        var listings = new List<(string Server, uint ItemId, string ItemName, long UnitPrice, bool IsFallback)>();
         foreach (var entry in snapshot)
         {
             var selected = entry.RecentPrices.Take(entry.Quantity).ToList();
             foreach (var price in selected)
             {
                 var server = string.IsNullOrWhiteSpace(price.WorldName) ? "Unknown" : price.WorldName;
-                var key = (server, entry.ItemId, entry.Name);
-                grouped.TryGetValue(key, out var state);
-                grouped[key] = (state.Quantity + 1, state.Total + price.UnitPrice);
+                listings.Add((server, entry.ItemId, entry.Name, price.UnitPrice, false));
             }
 
             var missing = entry.Quantity - selected.Count;
             for (var i = 0; i < missing; i++)
             {
-                var key = ("Fallback/Unknown", entry.ItemId, entry.Name);
-                grouped.TryGetValue(key, out var state);
-                grouped[key] = (state.Quantity + 1, state.Total + entry.FallbackUnitPrice);
+                listings.Add(("Fallback/Unknown", entry.ItemId, entry.Name, entry.FallbackUnitPrice, true));
             }
         }
 
-        var serverGroups = grouped
-            .GroupBy(x => x.Key.Server)
+        var serverGroups = listings
+            .GroupBy(x => x.Server)
             .Select(g => new
             {
                 Server = g.Key,
-                ServerTotal = g.Sum(x => x.Value.Total),
+                ServerTotal = g.Sum(x => x.UnitPrice),
                 Rows = g
-                    .OrderBy(x => x.Key.ItemName, StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(x => x.ItemName, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(x => x.UnitPrice)
                     .Select(x => new
                     {
-                        x.Key.ItemId,
-                        x.Key.ItemName,
-                        x.Value.Quantity,
-                        x.Value.Total,
+                        x.ItemId,
+                        x.ItemName,
+                        x.UnitPrice,
+                        x.IsFallback,
                     })
                     .ToList(),
             })
@@ -450,9 +447,9 @@ public sealed class MainWindow : Window, IDisposable
             }
 
             ImGui.TableSetColumnIndex(1);
-            ImGui.TextUnformatted($"{serverGroup.Rows.Count} items");
+            ImGui.TextUnformatted($"{serverGroup.Rows.Count} listings");
             ImGui.TableSetColumnIndex(2);
-            ImGui.TextUnformatted(serverGroup.Rows.Sum(x => x.Quantity).ToString());
+            ImGui.TextUnformatted(serverGroup.Rows.Count.ToString());
             ImGui.TableSetColumnIndex(3);
             ImGui.TextUnformatted($"{serverGroup.ServerTotal:N0}");
 
@@ -465,22 +462,19 @@ public sealed class MainWindow : Window, IDisposable
             ImGui.TableSetColumnIndex(0);
             ImGui.TextUnformatted(string.Empty);
             ImGui.TableSetColumnIndex(1);
-            if (ImGui.BeginTable($"buyModeItems-{serverGroup.Server}", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders | ImGuiTableFlags.Resizable))
+            if (ImGui.BeginTable($"buyModeItems-{serverGroup.Server}", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders | ImGuiTableFlags.Resizable))
             {
                 ImGui.TableSetupColumn("Item");
-                ImGui.TableSetupColumn("Qty");
-                ImGui.TableSetupColumn("Subtotal");
+                ImGui.TableSetupColumn("Unit Price");
                 ImGui.TableHeadersRow();
 
                 foreach (var row in serverGroup.Rows)
                 {
                     ImGui.TableNextRow();
                     ImGui.TableSetColumnIndex(0);
-                    ImGui.TextUnformatted(row.ItemName);
+                    ImGui.TextUnformatted(row.IsFallback ? $"{row.ItemName} (est.)" : row.ItemName);
                     ImGui.TableSetColumnIndex(1);
-                    ImGui.TextUnformatted(row.Quantity.ToString());
-                    ImGui.TableSetColumnIndex(2);
-                    ImGui.TextUnformatted($"{row.Total:N0}");
+                    ImGui.TextUnformatted($"{row.UnitPrice:N0}");
                 }
 
                 ImGui.EndTable();

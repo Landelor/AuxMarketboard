@@ -1,7 +1,7 @@
 {
   "Author": "Auxie",
   "Name": "AuxMarketboard",
-  "IconUrl": "https://raw.githubusercontent.com/auxee/AuxMarketboard/main/AuxMarketboard/plugin_icon.png",
+  "IconUrl": "https://raw.githubusercontent.com/Landelor/AuxMarketboard/main/AuxMarketboard/plugin_icon.png",
   "Punchline": "Price imported and custom item lists from Universalis",
   "Description": "Builds an item list manually or from artisan/teamcraft link imports, fetches current marketboard prices from Universalis, and shows per-item plus total cost.",
   "ApplicableVersion": "any",

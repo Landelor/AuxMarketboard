@@ -3,10 +3,10 @@
     "Author": "Auxie",
     "Name": "AuxMarketboard",
     "InternalName": "AuxMarketboard",
-    "IconUrl": "https://raw.githubusercontent.com/auxee/AuxMarketboard/main/AuxMarketboard/plugin_icon.png",
-    "AssemblyVersion": "0.1.0.0",
+    "IconUrl": "https://raw.githubusercontent.com/Landelor/AuxMarketboard/main/AuxMarketboard/plugin_icon.png",
+    "AssemblyVersion": "0.2.0.0",
     "TestingAssemblyVersion": null,
-    "RepoUrl": "https://github.com/Auxie/AuxMarketboard",
+    "RepoUrl": "https://github.com/Landelor/AuxMarketboard",
     "ApplicableVersion": "any",
     "DalamudApiLevel": 15,
     "Punchline": "Price imported and custom item lists from Universalis",
@@ -19,10 +19,10 @@
     ],
     "IsHide": false,
     "IsTestingExclusive": false,
-    "DownloadLinkInstall": "https://github.com/Auxie/AuxMarketboard/releases/latest/download/AuxMarketboard.zip",
-    "DownloadLinkTesting": "https://github.com/Auxie/AuxMarketboard/releases/latest/download/AuxMarketboard.zip",
-    "DownloadLinkUpdate": "https://github.com/Auxie/AuxMarketboard/releases/latest/download/AuxMarketboard.zip",
-    "LastUpdate": "0"
+    "DownloadLinkInstall": "https://github.com/Landelor/AuxMarketboard/releases/latest/download/AuxMarketboard.zip",
+    "DownloadLinkTesting": "https://github.com/Landelor/AuxMarketboard/releases/latest/download/AuxMarketboard.zip",
+    "DownloadLinkUpdate": "https://github.com/Landelor/AuxMarketboard/releases/latest/download/AuxMarketboard.zip",
+    "LastUpdate": "1790833036"
   },
   {
     "Author": "Auxie",
