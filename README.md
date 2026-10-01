@@ -2,6 +2,16 @@
 
 Dalamud plugin scaffold for pricing item lists from Universalis.
 
+## Install
+
+Add the following URL to Dalamud's custom plugin repositories (Settings → Experimental → Custom Plugin Repositories), then install AuxMarketboard from the Plugin Installer:
+
+```
+https://raw.githubusercontent.com/Landelor/AuxMarketboard/main/AuxieDalamudRepo/repo.json
+```
+
+Alternatively, download the latest release zip directly from the [Releases](https://github.com/Landelor/AuxMarketboard/releases/latest) page.
+
 ## Features
 
 - Add items manually with a searchable dropdown and quantity.
