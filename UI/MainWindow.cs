@@ -151,7 +151,7 @@ public sealed class MainWindow : Window, IDisposable
             configuration.Save();
         }
 
-        var scopeToken = ResolveScopeTarget();
+        var scopeToken = GetCachedScopeTarget();
         ImGui.TextUnformatted($"Active scope: {scopeToken}");
 
         var autoRefresh = configuration.AutoRefreshEnabled;
@@ -190,13 +190,22 @@ public sealed class MainWindow : Window, IDisposable
         }
     }
 
+    private string lastSearchQuery = "\0uninitialized";
+    private IReadOnlyList<(uint Id, string Name)> lastSearchResults = Array.Empty<(uint Id, string Name)>();
+
     private void DrawManualAdd()
     {
         ImGui.Text("Add item manually");
         ImGui.InputText("Search", ref itemSearch, 128);
         ImGui.TextUnformatted($"Selected: {selectedItemName}");
 
-        var matches = itemResolver.GetSearchMatches(itemSearch, 25);
+        if (!string.Equals(lastSearchQuery, itemSearch, StringComparison.Ordinal))
+        {
+            lastSearchQuery = itemSearch;
+            lastSearchResults = itemResolver.GetSearchMatches(itemSearch, 25);
+        }
+
+        var matches = lastSearchResults;
         if (matches.Count > 0)
         {
             if (ImGui.BeginListBox("##dynamicSearch", new System.Numerics.Vector2(ImGui.GetContentRegionAvail().X, 120)))
@@ -1110,6 +1119,27 @@ public sealed class MainWindow : Window, IDisposable
         ImGui.PushStyleColor(ImGuiCol.Text, new System.Numerics.Vector4(0.95f, 0.30f, 0.30f, 1.0f));
         ImGui.TextUnformatted("✗");
         ImGui.PopStyleColor();
+    }
+
+    private string? cachedScopeToken;
+    private DateTime cachedScopeExpiresUtc = DateTime.MinValue;
+
+    /// <summary>
+    /// ResolveScopeTarget() uses reflection to read the player's current world/data center,
+    /// which is too expensive to run every single ImGui frame while the window is open. Cache
+    /// the result briefly instead of recomputing it on every Draw() call.
+    /// </summary>
+    private string GetCachedScopeTarget()
+    {
+        var now = DateTime.UtcNow;
+        if (cachedScopeToken is not null && now < cachedScopeExpiresUtc)
+        {
+            return cachedScopeToken;
+        }
+
+        cachedScopeToken = ResolveScopeTarget();
+        cachedScopeExpiresUtc = now.AddSeconds(2);
+        return cachedScopeToken;
     }
 
     private string ResolveScopeTarget()

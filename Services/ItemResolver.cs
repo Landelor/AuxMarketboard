@@ -7,7 +7,7 @@ public sealed class ItemResolver
 {
     private readonly IDataManager dataManager;
     private Dictionary<uint, string>? namesById;
-    private List<(uint Id, string Name)>? indexedItems;
+    private List<(uint Id, string Name, string Normalized)>? indexedItems;
     private Dictionary<string, List<(uint Id, string Name)>>? normalizedItems;
     private Dictionary<uint, (uint ItemId, string ItemName, int Yield)>? recipeToResultItem;
 
@@ -26,72 +26,78 @@ public sealed class ItemResolver
 
         if (string.IsNullOrWhiteSpace(filter))
         {
-            return indexedItems.Take(maxResults).ToList();
+            return indexedItems.Take(maxResults).Select(x => (x.Id, x.Name)).ToList();
         }
 
         var trimmed = CleanupInput(filter);
         if (string.IsNullOrWhiteSpace(trimmed))
         {
-            return indexedItems.Take(maxResults).ToList();
+            return indexedItems.Take(maxResults).Select(x => (x.Id, x.Name)).ToList();
         }
 
-        var seen = new HashSet<uint>();
-        var results = new List<(uint Id, string Name)>();
-
-        if (TryParseItemId(trimmed, out var parsedId) && namesById is not null && namesById.TryGetValue(parsedId, out var parsedName))
+        uint? parsedId = null;
+        if (TryParseItemId(trimmed, out var candidateId) && namesById is not null && namesById.ContainsKey(candidateId))
         {
-            results.Add((parsedId, parsedName));
-            seen.Add(parsedId);
-        }
-
-        foreach (var item in indexedItems.Where(x => x.Name.Equals(trimmed, StringComparison.OrdinalIgnoreCase)))
-        {
-            if (seen.Add(item.Id))
-            {
-                results.Add(item);
-            }
-        }
-
-        foreach (var item in indexedItems.Where(x => x.Name.StartsWith(trimmed, StringComparison.OrdinalIgnoreCase)))
-        {
-            if (seen.Add(item.Id))
-            {
-                results.Add(item);
-            }
+            parsedId = candidateId;
         }
 
         var normalizedFilter = NormalizeLookupToken(trimmed);
-        if (!string.IsNullOrWhiteSpace(normalizedFilter))
+
+        // Single pass over the item index, classifying each item into exactly one priority
+        // bucket (mirrors the old multi-pass + de-dupe behavior but without rescanning the
+        // whole list per tier and without recomputing normalization per item per search).
+        var exact = new List<(uint Id, string Name)>();
+        var prefix = new List<(uint Id, string Name)>();
+        var normPrefix = new List<(uint Id, string Name)>();
+        var substr = new List<(uint Id, string Name)>();
+        var normSubstr = new List<(uint Id, string Name)>();
+
+        foreach (var item in indexedItems)
         {
-            foreach (var item in indexedItems.Where(x => NormalizeLookupToken(x.Name).StartsWith(normalizedFilter, StringComparison.Ordinal)))
+            if (parsedId.HasValue && item.Id == parsedId.Value)
             {
-                if (seen.Add(item.Id))
-                {
-                    results.Add(item);
-                }
+                continue;
+            }
+
+            if (item.Name.Equals(trimmed, StringComparison.OrdinalIgnoreCase))
+            {
+                exact.Add((item.Id, item.Name));
+            }
+            else if (item.Name.StartsWith(trimmed, StringComparison.OrdinalIgnoreCase))
+            {
+                prefix.Add((item.Id, item.Name));
+            }
+            else if (normalizedFilter.Length > 0 && item.Normalized.StartsWith(normalizedFilter, StringComparison.Ordinal))
+            {
+                normPrefix.Add((item.Id, item.Name));
+            }
+            else if (item.Name.Contains(trimmed, StringComparison.OrdinalIgnoreCase))
+            {
+                substr.Add((item.Id, item.Name));
+            }
+            else if (normalizedFilter.Length > 0 && item.Normalized.Contains(normalizedFilter, StringComparison.Ordinal))
+            {
+                normSubstr.Add((item.Id, item.Name));
             }
         }
 
-        foreach (var item in indexedItems.Where(x => x.Name.Contains(trimmed, StringComparison.OrdinalIgnoreCase)))
+        var results = new List<(uint Id, string Name)>(Math.Min(maxResults, 32));
+        if (parsedId.HasValue && namesById is not null && namesById.TryGetValue(parsedId.Value, out var parsedName))
         {
-            if (seen.Add(item.Id))
-            {
-                results.Add(item);
-            }
+            results.Add((parsedId.Value, parsedName));
         }
 
-        if (!string.IsNullOrWhiteSpace(normalizedFilter))
+        foreach (var bucket in new[] { exact, prefix, normPrefix, substr, normSubstr })
         {
-            foreach (var item in indexedItems.Where(x => NormalizeLookupToken(x.Name).Contains(normalizedFilter, StringComparison.Ordinal)))
+            if (results.Count >= maxResults)
             {
-                if (seen.Add(item.Id))
-                {
-                    results.Add(item);
-                }
+                break;
             }
+
+            results.AddRange(bucket);
         }
 
-        return results.Take(maxResults).ToList();
+        return results.Count > maxResults ? results.Take(maxResults).ToList() : results;
     }
 
     public bool TryGetName(uint itemId, out string name)
@@ -179,7 +185,7 @@ public sealed class ItemResolver
         var sheet = dataManager.GetExcelSheet<Item>();
         var recipeSheet = dataManager.GetExcelSheet<Recipe>();
         namesById = new Dictionary<uint, string>();
-        indexedItems = new List<(uint Id, string Name)>();
+        indexedItems = new List<(uint Id, string Name, string Normalized)>();
         normalizedItems = new Dictionary<string, List<(uint Id, string Name)>>(StringComparer.Ordinal);
         recipeToResultItem = new Dictionary<uint, (uint ItemId, string ItemName, int Yield)>();
 
@@ -198,10 +204,10 @@ public sealed class ItemResolver
                     continue;
                 }
 
-                namesById[row.RowId] = name;
-                indexedItems.Add((row.RowId, name));
-
                 var key = NormalizeLookupToken(name);
+                namesById[row.RowId] = name;
+                indexedItems.Add((row.RowId, name, key));
+
                 if (string.IsNullOrWhiteSpace(key))
                 {
                     continue;
