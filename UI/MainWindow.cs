@@ -13,6 +13,7 @@ public sealed class MainWindow : Window, IDisposable
     private readonly UniversalisClient universalisClient;
     private readonly ItemResolver itemResolver;
     private readonly MarketboardSearchService marketboardSearchService;
+    private readonly MarketboardCacheService marketboardCacheService;
     private readonly object syncRoot = new();
     private readonly JsonSerializerOptions jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
@@ -34,13 +35,15 @@ public sealed class MainWindow : Window, IDisposable
     private readonly HashSet<string> expandedBuyServers = new(StringComparer.OrdinalIgnoreCase);
     private int lastUpdatedItemCount;
 
-    public MainWindow(Configuration configuration, UniversalisClient universalisClient, ItemResolver itemResolver, MarketboardSearchService marketboardSearchService)
+    public MainWindow(Configuration configuration, UniversalisClient universalisClient, ItemResolver itemResolver, MarketboardSearchService marketboardSearchService, MarketboardCacheService marketboardCacheService)
         : base("AuxMarketboard")
     {
         this.configuration = configuration;
         this.universalisClient = universalisClient;
         this.itemResolver = itemResolver;
         this.marketboardSearchService = marketboardSearchService;
+        this.marketboardCacheService = marketboardCacheService;
+        this.marketboardCacheService.ItemCacheUpdatedFromLiveView += OnItemCacheUpdatedFromLiveView;
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -51,8 +54,40 @@ public sealed class MainWindow : Window, IDisposable
 
     public void Dispose()
     {
+        marketboardCacheService.ItemCacheUpdatedFromLiveView -= OnItemCacheUpdatedFromLiveView;
         refreshCts?.Cancel();
         refreshCts?.Dispose();
+    }
+
+    /// <summary>
+    /// Fired by <see cref="MarketboardCacheService"/> when the player actually views an item's
+    /// listings live, in-game. That's more current than anything a Universalis poll can offer,
+    /// so immediately refresh that one entry's displayed prices from the cache rather than
+    /// waiting for the next scheduled Universalis refresh.
+    /// </summary>
+    private void OnItemCacheUpdatedFromLiveView(uint itemId)
+    {
+        lock (syncRoot)
+        {
+            var entry = entries.FirstOrDefault(x => x.ItemId == itemId);
+            if (entry is null)
+            {
+                return;
+            }
+
+            ApplyCachedListings(entry);
+            entry.Status = "Updated (live view)";
+        }
+    }
+
+    private void ApplyCachedListings(ListEntry entry)
+    {
+        var listings = marketboardCacheService.GetCachedListings(entry.ItemId, entry.Quantity);
+        entry.RecentPrices = listings.ToList();
+        if (entry.FallbackUnitPrice <= 0 && listings.Count > 0)
+        {
+            entry.FallbackUnitPrice = listings[^1].UnitPrice;
+        }
     }
 
     public override void Draw()
@@ -629,9 +664,10 @@ public sealed class MainWindow : Window, IDisposable
                 {
                     if (!response.TryGetValue(entry.ItemId, out var data) || !data.HasData)
                     {
-                        entry.RecentPrices = new List<RecentPriceDetail>();
-                        entry.FallbackUnitPrice = 0;
-                        entry.Status = "No market data";
+                        // No fresh data this poll - don't wipe the cache; keep showing whatever
+                        // we last knew (live view or a previous poll) until it ages out.
+                        ApplyCachedListings(entry);
+                        entry.Status = entry.RecentPrices.Count > 0 ? "Updated (cached)" : "No market data";
                         continue;
                     }
 
@@ -644,13 +680,15 @@ public sealed class MainWindow : Window, IDisposable
                             Quantity = Math.Max(1, x.Quantity),
                             WorldName = x.WorldName ?? string.Empty,
                             UnixTimestamp = x.LastReviewTime,
+                            ListingId = ulong.TryParse(x.ListingId, out var parsedListingId) ? parsedListingId : 0,
                         })
                         .Where(x => x.UnitPrice > 0)
-                        .Take(entry.Quantity)
                         .ToList() ?? new List<RecentPriceDetail>();
 
+                    var usedHistoryFallback = false;
                     if (listingPrices.Count == 0)
                     {
+                        usedHistoryFallback = true;
                         listingPrices = data.RecentHistory?
                             .OrderBy(x => x.PricePerUnit)
                             .ThenByDescending(x => x.Timestamp)
@@ -666,12 +704,24 @@ public sealed class MainWindow : Window, IDisposable
                             .ToList() ?? new List<RecentPriceDetail>();
                     }
 
-                    entry.RecentPrices = listingPrices;
+                    // Historical sales aren't real standing listings, so they shouldn't be
+                    // merged into the stable local cache (no listing ID to merge by anyway) -
+                    // use them as a direct, un-cached fallback display instead.
+                    if (usedHistoryFallback)
+                    {
+                        entry.RecentPrices = listingPrices;
+                    }
+                    else
+                    {
+                        var merged = marketboardCacheService.MergeUniversalisListings(entry.ItemId, listingPrices);
+                        entry.RecentPrices = merged.Take(entry.Quantity).ToList();
+                    }
+
                     entry.FallbackUnitPrice = data.MinPrice > 0
                         ? data.MinPrice
-                        : (listingPrices.Count > 0 ? listingPrices.Last().UnitPrice : 0);
-                    entry.Status = listingPrices.Count > 0
-                        ? $"Updated ({listingPrices.Count} recent)"
+                        : (entry.RecentPrices.Count > 0 ? entry.RecentPrices[^1].UnitPrice : 0);
+                    entry.Status = entry.RecentPrices.Count > 0
+                        ? $"Updated ({entry.RecentPrices.Count} recent)"
                         : "Updated (fallback only)";
                 }
             }
@@ -1101,6 +1151,7 @@ public sealed class MainWindow : Window, IDisposable
                 Quantity = x.Quantity,
                 WorldName = x.WorldName,
                 UnixTimestamp = x.UnixTimestamp,
+                ListingId = x.ListingId,
             }).ToList(),
             FallbackUnitPrice = source.FallbackUnitPrice,
             Status = source.Status,

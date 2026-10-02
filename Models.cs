@@ -56,6 +56,7 @@ public sealed class RecentPriceDetail
     public int Quantity { get; set; } = 1;
     public string WorldName { get; set; } = string.Empty;
     public long UnixTimestamp { get; set; }
+    public ulong ListingId { get; set; }
 }
 
 public sealed class UniversalisMultiResponse
@@ -101,6 +102,9 @@ public sealed class UniversalisListing
 
     [JsonPropertyName("worldName")]
     public string? WorldName { get; set; }
+
+    [JsonPropertyName("listingID")]
+    public string? ListingId { get; set; }
 }
 
 public sealed class UniversalisHistoryEntry

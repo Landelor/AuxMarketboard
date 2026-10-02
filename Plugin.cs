@@ -19,11 +19,13 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IPlayerState PlayerState { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
+    [PluginService] internal static IMarketBoard MarketBoard { get; private set; } = null!;
 
     private readonly WindowSystem windowSystem = new("AuxMarketboard");
     private readonly MainWindow mainWindow;
     private readonly UniversalisClient universalisClient;
     private readonly ItemResolver itemResolver;
+    private readonly MarketboardCacheService marketboardCacheService;
 
     public Configuration Configuration { get; }
 
@@ -57,8 +59,9 @@ public sealed class Plugin : IDalamudPlugin
 
         universalisClient = new UniversalisClient();
         itemResolver = new ItemResolver(DataManager);
+        marketboardCacheService = new MarketboardCacheService(MarketBoard, Log);
         var marketboardSearchService = new MarketboardSearchService(GameGui, Log);
-        mainWindow = new MainWindow(Configuration, universalisClient, itemResolver, marketboardSearchService);
+        mainWindow = new MainWindow(Configuration, universalisClient, itemResolver, marketboardSearchService, marketboardCacheService);
 
         windowSystem.AddWindow(mainWindow);
 
@@ -80,6 +83,7 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.RemoveAllWindows();
         mainWindow.Dispose();
         universalisClient.Dispose();
+        marketboardCacheService.Dispose();
     }
 
     private void OnCommand(string command, string args)
